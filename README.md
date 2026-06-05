@@ -77,6 +77,6 @@ The starter uses:
 
 - `1 point` for every `1000` purchase amount
 - `1 point = 10` redemption value
-- Customers cannot redeem more points than their current balance
+- Customers cannot rede em more points than their current balance
 
 You can change these values in `server/src/config/loyalty.ts`.

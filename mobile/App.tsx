@@ -12,6 +12,14 @@ import {
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
+function initials(name: string) {
+  return name
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000";
 
 type Customer = {
@@ -60,6 +68,7 @@ export default function App() {
   const [purchaseAmount, setPurchaseAmount] = useState("");
   const [redeemPoints, setRedeemPoints] = useState("");
   const [loading, setLoading] = useState(false);
+  const [actionTab, setActionTab] = useState<"earn" | "redeem">("earn");
 
   const canCreate = useMemo(() => name.trim() && phone.trim(), [name, phone]);
   const canEarn = Boolean(selectedCustomer && purchaseAmount.trim());
@@ -172,6 +181,11 @@ export default function App() {
     loadCustomers();
   }, []);
 
+  const earnPreview =
+    purchaseAmount && !isNaN(Number(purchaseAmount))
+      ? Math.floor(Number(purchaseAmount) * 10)
+      : null;
+
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.safeArea}>
@@ -181,111 +195,174 @@ export default function App() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {/* Header */}
           <View style={styles.header}>
             <Text style={styles.kicker}>Loyalty desk</Text>
             <Text style={styles.title}>Customers</Text>
           </View>
 
-          <View style={styles.searchBox}>
+          {/* Search */}
+          <View style={styles.searchRow}>
             <TextInput
               value={search}
               onChangeText={setSearch}
               onSubmitEditing={() => loadCustomers(search)}
-              placeholder="Search by name or phone"
+              placeholder="Search by name or phone…"
               returnKeyType="search"
               style={styles.searchInput}
+              placeholderTextColor="#A0A09A"
             />
-            <Pressable style={styles.searchButton} onPress={() => loadCustomers(search)}>
-              <Text style={styles.searchButtonText}>Search</Text>
+            <Pressable style={styles.searchBtn} onPress={() => loadCustomers(search)}>
+              <Text style={styles.searchBtnText}>Search</Text>
             </Pressable>
           </View>
 
+          {/* Selected customer card */}
           {selectedCustomer ? (
             <View style={styles.balanceCard}>
-              <View>
-                <Text style={styles.customerNameLarge}>{selectedCustomer.name}</Text>
-                <Text style={styles.customerPhone}>{selectedCustomer.phone}</Text>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{initials(selectedCustomer.name)}</Text>
               </View>
-              <View style={styles.balancePill}>
-                <Text style={styles.balanceNumber}>{selectedCustomer.balance}</Text>
-                <Text style={styles.balanceLabel}>points</Text>
+              <View style={styles.custMeta}>
+                <Text style={styles.custNameLarge}>{selectedCustomer.name}</Text>
+                <Text style={styles.custPhone}>{selectedCustomer.phone}</Text>
+              </View>
+              <View style={styles.pointsPill}>
+                <Text style={styles.pointsNum}>{selectedCustomer.balance.toLocaleString()}</Text>
+                <Text style={styles.pointsLbl}>points</Text>
               </View>
             </View>
           ) : (
-            <View style={styles.emptySelection}>
-              <Text style={styles.emptyTitle}>Select a customer</Text>
-              <Text style={styles.emptyText}>
-                Search or create a customer, then earn or redeem points.
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyTitle}>No customer selected</Text>
+              <Text style={styles.emptyBody}>
+                Search or create a customer to earn or redeem points.
               </Text>
             </View>
           )}
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Point action</Text>
-            <View style={styles.actionRow}>
-              <TextInput
-                value={purchaseAmount}
-                onChangeText={setPurchaseAmount}
-                placeholder="Purchase amount"
-                keyboardType="numeric"
-                style={styles.actionInput}
-              />
-              <Pressable
-                style={[styles.primaryButton, !canEarn && styles.disabledButton]}
-                onPress={earnPoints}
-                disabled={!canEarn}
-              >
-                <Text style={styles.primaryButtonText}>Earn</Text>
-              </Pressable>
+          {/* Point action */}
+          <Text style={styles.sectionLabel}>Point action</Text>
+          <View style={styles.actionCard}>
+            <View style={styles.tabRow}>
+              {(["earn", "redeem"] as const).map((tab) => (
+                <Pressable
+                  key={tab}
+                  style={[styles.tab, actionTab === tab && styles.tabActive]}
+                  onPress={() => setActionTab(tab)}
+                >
+                  <Text style={[styles.tabText, actionTab === tab && styles.tabTextActive]}>
+                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  </Text>
+                </Pressable>
+              ))}
             </View>
-            <View style={styles.actionRow}>
-              <TextInput
-                value={redeemPoints}
-                onChangeText={setRedeemPoints}
-                placeholder="Redeem points"
-                keyboardType="numeric"
-                style={styles.actionInput}
-              />
-              <Pressable
-                style={[styles.outlineButton, !canRedeem && styles.disabledButton]}
-                onPress={redeem}
-                disabled={!canRedeem}
-              >
-                <Text style={styles.outlineButtonText}>Redeem</Text>
-              </Pressable>
+
+            <View style={styles.actionBody}>
+              {actionTab === "earn" ? (
+                <>
+                  <Text style={styles.actionHint}>Enter the purchase total to calculate points</Text>
+                  <View style={styles.actionRow}>
+                    <TextInput
+                      value={purchaseAmount}
+                      onChangeText={setPurchaseAmount}
+                      placeholder="Purchase amount"
+                      keyboardType="numeric"
+                      style={styles.actionInput}
+                      placeholderTextColor="#A0A09A"
+                    />
+                    <Pressable
+                      style={[styles.btnEarn, !canEarn && styles.btnDisabled]}
+                      onPress={earnPoints}
+                      disabled={!canEarn}
+                    >
+                      <Text style={styles.btnEarnText}>Earn</Text>
+                    </Pressable>
+                  </View>
+                  <Text style={styles.earnRate}>
+                    10 pts per £1
+                    {earnPreview !== null ? (
+                      <Text style={styles.earnPreview}>{"  →  "}+{earnPreview} pts</Text>
+                    ) : null}
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.actionHint}>Enter points to redeem for this customer</Text>
+                  <View style={styles.actionRow}>
+                    <TextInput
+                      value={redeemPoints}
+                      onChangeText={setRedeemPoints}
+                      placeholder="Points to redeem"
+                      keyboardType="numeric"
+                      style={styles.actionInput}
+                      placeholderTextColor="#A0A09A"
+                    />
+                    <Pressable
+                      style={[styles.btnRedeem, !canRedeem && styles.btnDisabled]}
+                      onPress={redeem}
+                      disabled={!canRedeem}
+                    >
+                      <Text style={styles.btnRedeemText}>Redeem</Text>
+                    </Pressable>
+                  </View>
+                  {selectedCustomer && (
+                    <Text style={styles.earnRate}>
+                      Available:{" "}
+                      <Text style={styles.earnPreview}>
+                        {selectedCustomer.balance.toLocaleString()} pts
+                      </Text>
+                    </Text>
+                  )}
+                </>
+              )}
             </View>
           </View>
 
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Recent customers</Text>
-              {loading ? <ActivityIndicator size="small" /> : null}
-            </View>
-            {customers.map((item) => (
-              <Pressable
-                key={item.id}
-                style={[
-                  styles.customerRow,
-                  selectedCustomer?.id === item.id && styles.selectedRow
-                ]}
-                onPress={() => selectCustomer(item)}
-              >
-                <View style={styles.customerInfo}>
-                  <Text style={styles.customerName}>{item.name}</Text>
-                  <Text style={styles.muted}>{item.phone}</Text>
-                </View>
-                <Text style={styles.points}>{item.balance} pts</Text>
-              </Pressable>
-            ))}
+          {/* Recent customers */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionLabel}>Recent customers</Text>
+            {loading ? <ActivityIndicator size="small" color="#534AB7" /> : null}
           </View>
+          {customers.length === 0 ? (
+            <Text style={styles.mutedText}>No customers yet.</Text>
+          ) : (
+            customers.map((item) => {
+              const isSelected = selectedCustomer?.id === item.id;
+              return (
+                <Pressable
+                  key={item.id}
+                  style={[styles.custRow, isSelected && styles.custRowSelected]}
+                  onPress={() => selectCustomer(item)}
+                >
+                  <View style={[styles.avatarSm, isSelected && styles.avatarSmSelected]}>
+                    <Text style={[styles.avatarSmText, isSelected && styles.avatarSmTextSelected]}>
+                      {initials(item.name)}
+                    </Text>
+                  </View>
+                  <View style={styles.custRowInfo}>
+                    <Text style={styles.custRowName}>{item.name}</Text>
+                    <Text style={styles.custRowPhone}>{item.phone}</Text>
+                  </View>
+                  <View style={[styles.ptsBadge, isSelected && styles.ptsBadgeSelected]}>
+                    <Text style={[styles.ptsBadgeText, isSelected && styles.ptsBadgeTextSelected]}>
+                      {item.balance.toLocaleString()} pts
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })
+          )}
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>New customer</Text>
+          {/* New customer */}
+          <Text style={[styles.sectionLabel, { marginTop: 6 }]}>New customer</Text>
+          <View style={styles.newCustCard}>
             <TextInput
               value={name}
               onChangeText={setName}
               placeholder="Customer name"
               style={styles.fullInput}
+              placeholderTextColor="#A0A09A"
             />
             <TextInput
               value={phone}
@@ -293,37 +370,41 @@ export default function App() {
               placeholder="Phone number"
               keyboardType="phone-pad"
               style={styles.fullInput}
+              placeholderTextColor="#A0A09A"
             />
             <Pressable
-              style={[styles.primaryButtonWide, !canCreate && styles.disabledButton]}
+              style={[styles.btnCreate, !canCreate && styles.btnDisabled]}
               onPress={createCustomer}
               disabled={!canCreate}
             >
-              <Text style={styles.primaryButtonText}>Create customer</Text>
+              <Text style={styles.btnCreateText}>Create customer</Text>
             </Pressable>
           </View>
 
+          {/* History */}
           {selectedCustomer ? (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>History</Text>
-              {transactions.length ? (
+            <>
+              <Text style={[styles.sectionLabel, { marginTop: 6 }]}>History</Text>
+              {transactions.length === 0 ? (
+                <Text style={styles.mutedText}>No point history yet.</Text>
+              ) : (
                 transactions.slice(0, 8).map((item) => (
-                  <View key={item.id} style={styles.transactionRow}>
+                  <View key={item.id} style={styles.txRow}>
                     <View>
-                      <Text style={styles.transactionType}>{item.type}</Text>
-                      <Text style={styles.muted}>{formatDate(item.created_at)}</Text>
+                      <Text style={styles.txType}>{item.type}</Text>
+                      <Text style={styles.txDate}>{formatDate(item.created_at)}</Text>
                     </View>
-                    <Text style={item.points > 0 ? styles.positive : styles.negative}>
+                    <Text style={item.points > 0 ? styles.txPositive : styles.txNegative}>
                       {item.points > 0 ? "+" : ""}
                       {item.points} pts
                     </Text>
                   </View>
                 ))
-              ) : (
-                <Text style={styles.emptyText}>No point history yet.</Text>
               )}
-            </View>
+            </>
           ) : null}
+
+          <View style={{ height: 16 }} />
         </ScrollView>
       </SafeAreaView>
     </SafeAreaProvider>
@@ -338,245 +419,264 @@ function formatDate(value: string) {
   return new Date(value).toLocaleDateString();
 }
 
+const PURPLE = "#534AB7";
+const PURPLE_LIGHT = "#EEEDFE";
+const PURPLE_MID = "#7F77DD";
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#f5f6f8"
+    backgroundColor: "#F5F4F0"
   },
   content: {
     padding: 16,
+    paddingTop: 12,
     paddingBottom: 32,
-    gap: 16
+    gap: 8
   },
-  header: {
-    gap: 4
-  },
+
+  // Header
+  header: { marginBottom: 4 },
   kicker: {
-    color: "#64748b",
-    fontSize: 13,
-    fontWeight: "700",
-    textTransform: "uppercase"
+    fontSize: 11,
+    color: "#888780",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 2
   },
-  title: {
-    color: "#0f172a",
-    fontSize: 32,
-    fontWeight: "800"
-  },
-  searchBox: {
-    backgroundColor: "#ffffff",
-    borderColor: "#dbe1e8",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    padding: 6
-  },
+  title: { fontSize: 26, fontWeight: "600", color: "#1A1A18" },
+
+  // Search
+  searchRow: { flexDirection: "row", gap: 8 },
   searchInput: {
     flex: 1,
-    fontSize: 16,
-    minHeight: 48,
-    paddingHorizontal: 10
+    height: 42,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    borderWidth: 0.5,
+    borderColor: "#D3D1C7",
+    paddingHorizontal: 12,
+    fontSize: 14,
+    color: "#1A1A18"
   },
-  searchButton: {
+  searchBtn: {
+    height: 42,
+    paddingHorizontal: 16,
+    backgroundColor: PURPLE,
+    borderRadius: 10,
     alignItems: "center",
-    backgroundColor: "#0f766e",
-    borderRadius: 6,
-    justifyContent: "center",
-    minHeight: 48,
-    paddingHorizontal: 16
+    justifyContent: "center"
   },
-  searchButtonText: {
-    color: "#ffffff",
-    fontWeight: "800"
-  },
+  searchBtnText: { fontSize: 14, fontWeight: "600", color: "#fff" },
+
+  // Balance card
   balanceCard: {
-    alignItems: "center",
-    backgroundColor: "#102a43",
-    borderRadius: 8,
     flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 18
-  },
-  customerNameLarge: {
-    color: "#ffffff",
-    fontSize: 22,
-    fontWeight: "800"
-  },
-  customerPhone: {
-    color: "#cbd5e1",
-    fontSize: 15,
-    marginTop: 4
-  },
-  balancePill: {
     alignItems: "center",
-    backgroundColor: "#ffffff",
-    borderRadius: 8,
-    minWidth: 88,
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    borderWidth: 0.5,
+    borderColor: "#D3D1C7",
+    padding: 14,
+    gap: 10
+  },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#CECBF6",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  avatarText: { fontSize: 14, fontWeight: "600", color: "#3C3489" },
+  custMeta: { flex: 1 },
+  custNameLarge: { fontSize: 16, fontWeight: "600", color: "#1A1A18" },
+  custPhone: { fontSize: 12, color: "#888780", marginTop: 2 },
+  pointsPill: {
+    backgroundColor: PURPLE_LIGHT,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    alignItems: "center",
+    minWidth: 72
+  },
+  pointsNum: { fontSize: 20, fontWeight: "600", color: "#3C3489", lineHeight: 24 },
+  pointsLbl: { fontSize: 10, color: "#534AB7", letterSpacing: 0.5, marginTop: 1 },
+
+  // Empty card
+  emptyCard: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    borderWidth: 0.5,
+    borderColor: "#D3D1C7",
+    padding: 16,
+    alignItems: "center"
+  },
+  emptyTitle: { fontSize: 15, fontWeight: "500", color: "#1A1A18", marginBottom: 4 },
+  emptyBody: { fontSize: 13, color: "#888780", textAlign: "center", lineHeight: 18 },
+
+  // Section labels
+  sectionLabel: {
+    fontSize: 11,
+    color: "#888780",
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+    marginTop: 8,
+    marginBottom: 2
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 8,
+    marginBottom: 2
+  },
+
+  // Action card
+  actionCard: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    borderWidth: 0.5,
+    borderColor: "#D3D1C7",
+    overflow: "hidden"
+  },
+  tabRow: {
+    flexDirection: "row",
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#D3D1C7"
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: "center"
+  },
+  tabActive: {
+    borderBottomWidth: 2,
+    borderBottomColor: PURPLE
+  },
+  tabText: { fontSize: 14, fontWeight: "500", color: "#888780" },
+  tabTextActive: { color: PURPLE },
+  actionBody: { padding: 14, gap: 8 },
+  actionHint: { fontSize: 12, color: "#888780" },
+  actionRow: { flexDirection: "row", gap: 8, alignItems: "center" },
+  actionInput: {
+    flex: 1,
+    height: 40,
+    backgroundColor: "#F5F4F0",
+    borderRadius: 9,
+    borderWidth: 0.5,
+    borderColor: "#D3D1C7",
+    paddingHorizontal: 12,
+    fontSize: 14,
+    color: "#1A1A18"
+  },
+  btnEarn: {
+    height: 40,
+    paddingHorizontal: 20,
+    backgroundColor: PURPLE,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  btnEarnText: { fontSize: 14, fontWeight: "600", color: "#fff" },
+  btnRedeem: {
+    height: 40,
+    paddingHorizontal: 20,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: PURPLE,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  btnRedeemText: { fontSize: 14, fontWeight: "600", color: PURPLE },
+  btnDisabled: { opacity: 0.4 },
+  earnRate: { fontSize: 12, color: "#888780" },
+  earnPreview: { color: PURPLE, fontWeight: "600" },
+
+  // Customer rows
+  custRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 11,
+    borderWidth: 0.5,
+    borderColor: "#D3D1C7",
+    padding: 10,
+    gap: 10
+  },
+  custRowSelected: {
+    borderColor: PURPLE_MID,
+    backgroundColor: PURPLE_LIGHT
+  },
+  avatarSm: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#E1F5EE",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  avatarSmSelected: { backgroundColor: "#CECBF6" },
+  avatarSmText: { fontSize: 11, fontWeight: "600", color: "#0F6E56" },
+  avatarSmTextSelected: { color: "#3C3489" },
+  custRowInfo: { flex: 1 },
+  custRowName: { fontSize: 14, fontWeight: "500", color: "#1A1A18" },
+  custRowPhone: { fontSize: 12, color: "#888780", marginTop: 1 },
+  ptsBadge: {
+    backgroundColor: "#F1EFE8",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4
+  },
+  ptsBadgeSelected: { backgroundColor: "#AFA9EC" },
+  ptsBadgeText: { fontSize: 12, fontWeight: "500", color: "#5F5E5A" },
+  ptsBadgeTextSelected: { color: "#26215C" },
+
+  // New customer
+  newCustCard: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    borderWidth: 0.5,
+    borderColor: "#D3D1C7",
+    padding: 14,
+    gap: 8
+  },
+  fullInput: {
+    height: 42,
+    backgroundColor: "#F5F4F0",
+    borderRadius: 9,
+    borderWidth: 0.5,
+    borderColor: "#D3D1C7",
+    paddingHorizontal: 12,
+    fontSize: 14,
+    color: "#1A1A18"
+  },
+  btnCreate: {
+    height: 44,
+    backgroundColor: PURPLE,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2
+  },
+  btnCreateText: { fontSize: 14, fontWeight: "600", color: "#fff" },
+
+  // Transactions
+  txRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    borderWidth: 0.5,
+    borderColor: "#D3D1C7",
     paddingHorizontal: 12,
     paddingVertical: 10
   },
-  balanceNumber: {
-    color: "#0f766e",
-    fontSize: 24,
-    fontWeight: "900"
-  },
-  balanceLabel: {
-    color: "#64748b",
-    fontSize: 12,
-    fontWeight: "700"
-  },
-  emptySelection: {
-    backgroundColor: "#ffffff",
-    borderColor: "#dbe1e8",
-    borderRadius: 8,
-    borderWidth: 1,
-    padding: 16
-  },
-  emptyTitle: {
-    color: "#0f172a",
-    fontSize: 18,
-    fontWeight: "800"
-  },
-  emptyText: {
-    color: "#64748b",
-    fontSize: 14,
-    lineHeight: 20,
-    marginTop: 4
-  },
-  section: {
-    backgroundColor: "#ffffff",
-    borderColor: "#dbe1e8",
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 10,
-    padding: 14
-  },
-  sectionHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between"
-  },
-  sectionTitle: {
-    color: "#1e293b",
-    fontSize: 17,
-    fontWeight: "800"
-  },
-  actionRow: {
-    flexDirection: "row",
-    gap: 8
-  },
-  actionInput: {
-    backgroundColor: "#f8fafc",
-    borderColor: "#dbe1e8",
-    borderRadius: 6,
-    borderWidth: 1,
-    flex: 1,
-    fontSize: 16,
-    minHeight: 50,
-    paddingHorizontal: 12
-  },
-  fullInput: {
-    backgroundColor: "#f8fafc",
-    borderColor: "#dbe1e8",
-    borderRadius: 6,
-    borderWidth: 1,
-    fontSize: 16,
-    minHeight: 50,
-    paddingHorizontal: 12
-  },
-  primaryButton: {
-    alignItems: "center",
-    backgroundColor: "#0f766e",
-    borderRadius: 6,
-    justifyContent: "center",
-    minHeight: 50,
-    minWidth: 92,
-    paddingHorizontal: 14
-  },
-  primaryButtonWide: {
-    alignItems: "center",
-    backgroundColor: "#0f766e",
-    borderRadius: 6,
-    justifyContent: "center",
-    minHeight: 50,
-    paddingHorizontal: 14
-  },
-  outlineButton: {
-    alignItems: "center",
-    backgroundColor: "#ffffff",
-    borderColor: "#0f766e",
-    borderRadius: 6,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 50,
-    minWidth: 92,
-    paddingHorizontal: 14
-  },
-  disabledButton: {
-    opacity: 0.45
-  },
-  primaryButtonText: {
-    color: "#ffffff",
-    fontWeight: "800"
-  },
-  outlineButtonText: {
-    color: "#0f766e",
-    fontWeight: "800"
-  },
-  customerRow: {
-    alignItems: "center",
-    borderColor: "#edf2f7",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    minHeight: 66,
-    paddingHorizontal: 12
-  },
-  selectedRow: {
-    backgroundColor: "#ecfdf5",
-    borderColor: "#0f766e"
-  },
-  customerInfo: {
-    flex: 1,
-    paddingRight: 8
-  },
-  customerName: {
-    color: "#111827",
-    fontSize: 16,
-    fontWeight: "800"
-  },
-  muted: {
-    color: "#64748b",
-    fontSize: 13,
-    marginTop: 3
-  },
-  points: {
-    color: "#0f766e",
-    fontSize: 15,
-    fontWeight: "900"
-  },
-  transactionRow: {
-    alignItems: "center",
-    borderTopColor: "#edf2f7",
-    borderTopWidth: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 10
-  },
-  transactionType: {
-    color: "#334155",
-    fontSize: 15,
-    fontWeight: "800",
-    textTransform: "capitalize"
-  },
-  positive: {
-    color: "#047857",
-    fontSize: 15,
-    fontWeight: "900"
-  },
-  negative: {
-    color: "#b91c1c",
-    fontSize: 15,
-    fontWeight: "900"
-  }
+  txType: { fontSize: 13, fontWeight: "500", color: "#1A1A18", textTransform: "capitalize" },
+  txDate: { fontSize: 11, color: "#888780", marginTop: 2 },
+  txPositive: { fontSize: 13, fontWeight: "600", color: "#0F6E56" },
+  txNegative: { fontSize: 13, fontWeight: "600", color: "#993C1D" },
+
+  mutedText: { fontSize: 13, color: "#888780" }
 });
